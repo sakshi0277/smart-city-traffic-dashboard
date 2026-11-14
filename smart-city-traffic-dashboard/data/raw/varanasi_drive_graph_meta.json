@@ -1,0 +1,15 @@
+{
+  "label": "REAL",
+  "source": "OpenStreetMap contributors (via OSMnx 2.1.1)",
+  "licence": "ODbL 1.0",
+  "network_type": "drive",
+  "bbox_left_bottom_right_top": [
+    82.67035,
+    25.16632,
+    83.17381,
+    25.59775
+  ],
+  "nodes": 88247,
+  "edges": 218343,
+  "downloaded_on": "2026-11-14"
+}

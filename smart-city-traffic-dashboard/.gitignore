@@ -1,0 +1,39 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Large downloads and generated files (re-create with the scripts)
+data/raw/*
+data/processed/*
+data/simulated/*
+!data/**/.gitkeep
+*.graphml
+*.gpkg
+cache/
+
+# Trained models and community database
+models/*.joblib
+data/community.db
+reports/*.pdf
+!reports/.gitkeep
+
+# Secrets
+.env
+secrets.toml
+
+# Large generated files and temporary archives
+smart-city-traffic-dashboard/data/raw/varanasi_drive_graph.graphml
+*.zip
+smart-city-traffic-dashboard/module3_temp/

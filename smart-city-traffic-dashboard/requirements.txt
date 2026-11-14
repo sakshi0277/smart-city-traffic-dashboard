@@ -1,0 +1,33 @@
+# Smart City Traffic & Route Intelligence Dashboard - Varanasi
+# Lower bounds chosen for Python 3.12 - 3.14 compatibility.
+# pip installs the newest version that works on YOUR Python.
+
+# Data handling
+pandas>=2.3.3
+numpy>=2.3.3
+
+# Maps, road network and geo
+osmnx>=2.0.6
+networkx>=3.4
+geopandas>=1.1.0
+shapely>=2.1.2
+folium>=0.20.0
+
+# Dashboard
+streamlit>=1.50.0
+streamlit-folium>=0.25.0
+plotly>=6.0.0
+
+# Machine learning
+scikit-learn>=1.7.2
+joblib>=1.4.2
+
+# Utilities
+requests>=2.32.0
+pyyaml>=6.0.2
+
+# PDF report export (Phase 15)
+fpdf2>=2.8.0
+
+# Testing
+pytest>=8.0.0
