@@ -18,10 +18,15 @@ st.set_page_config(
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 DATA_DIR = PROJECT_ROOT / "data" / "demo"
 DATA_FILE = DATA_DIR / "road_closures.csv"
 
+USER_DATA_DIR = PROJECT_ROOT / "data" / "user"
+USER_DATA_FILE = USER_DATA_DIR / "road_reports.csv"
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
+USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # --------------------------------------------------
@@ -154,28 +159,63 @@ def create_demo_data():
 
 def load_data():
 
+    # Load DEMO records
     if not DATA_FILE.exists():
-        df = create_demo_data()
-        df.to_csv(DATA_FILE, index=False)
-        return df
+        demo_df = create_demo_data()
+        demo_df.to_csv(DATA_FILE, index=False)
+    else:
+        demo_df = pd.read_csv(DATA_FILE)
 
-    try:
-        df = pd.read_csv(DATA_FILE)
+    # Migrate old USER records out of DEMO file
+    if "source" in demo_df.columns:
+        old_user_df = demo_df[
+            demo_df["source"].fillna("DEMO").str.upper() == "USER"
+        ].copy()
 
-        if not set(COLUMNS).issubset(df.columns):
-            st.warning("Data file format is incomplete. Recreating demo data.")
-            df = create_demo_data()
-            df.to_csv(DATA_FILE, index=False)
+        demo_df = demo_df[
+            demo_df["source"].fillna("DEMO").str.upper() != "USER"
+        ].copy()
 
-        return df
+        if not old_user_df.empty:
+            if USER_DATA_FILE.exists():
+                existing_user_df = pd.read_csv(USER_DATA_FILE)
+            else:
+                existing_user_df = pd.DataFrame(columns=COLUMNS)
 
-    except (OSError, pd.errors.ParserError, ValueError):
-        st.error("Unable to read the road alerts data file.")
-        return create_demo_data()
+            user_df = pd.concat(
+                [existing_user_df, old_user_df],
+                ignore_index=True
+            )
+
+            user_df = user_df.drop_duplicates(
+                subset=["report_id"],
+                keep="last"
+            )
+
+            user_df.to_csv(USER_DATA_FILE, index=False)
+            demo_df.to_csv(DATA_FILE, index=False)
+
+    # Load separate USER reports
+    if USER_DATA_FILE.exists():
+        user_df = pd.read_csv(USER_DATA_FILE)
+    else:
+        user_df = pd.DataFrame(columns=COLUMNS)
+
+    # Show DEMO + USER records together
+    return pd.concat(
+        [demo_df, user_df],
+        ignore_index=True
+    )
 
 
 def save_data(df):
-    df.to_csv(DATA_FILE, index=False)
+
+    # Save only USER reports
+    user_df = df[
+        df["source"].fillna("DEMO").str.upper() == "USER"
+    ].copy()
+
+    user_df.to_csv(USER_DATA_FILE, index=False)
 
 
 df = load_data()
@@ -465,34 +505,32 @@ with st.form("road_report_form", clear_on_submit=True):
         "Traffic Blockage"
     ]
 )
-        )
-
-        report_severity = st.selectbox(
+report_severity = st.selectbox(
             "Severity",
             ["Low", "Medium", "High"]
         )
 
-        start_date = st.date_input(
+start_date = st.date_input(
             "Reported start date",
             value=date.today()
         )
 
-    with r2:
+with r2:
 
-        expected_end = st.date_input(
-            "Expected end date",
-            value=date.today() + timedelta(days=2)
-        )
+    expected_end = st.date_input(
+        "Expected end date",
+        value=date.today() + timedelta(days=2)
+    )
 
-        affected_area = st.text_input(
-            "Affected road / area",
-            placeholder="Enter road or area name"
-        )
+    affected_area = st.text_input(
+        "Affected road / area",
+        placeholder="Enter road or area name"
+    )
 
-        detour = st.text_input(
-            "Suggested alternative",
-            placeholder="Optional"
-        )
+    detour = st.text_input(
+        "Suggested alternative",
+        placeholder="Optional"
+    )
 
     description = st.text_area(
         "Report description",
@@ -503,54 +541,46 @@ with st.form("road_report_form", clear_on_submit=True):
         "Submit Road Report",
         use_container_width=True
     )
+if submitted:
+    if not affected_area.strip() or not description.strip():
+        st.error("Please enter the affected area and report description.")
 
-    if submitted:
+    elif expected_end < start_date:
+        st.error("Expected end date cannot be before the start date.")
 
-        if not affected_area.strip() or not description.strip():
+    else:
+        lat, lon = LOCATIONS[report_location]
 
-            st.error(
-                "Please enter the affected area and report description."
-            )
+        new_record = {
+            "report_id": "USER-" + uuid.uuid4().hex[:8].upper(),
+            "location": report_location,
+            "latitude": lat,
+            "longitude": lon,
+            "alert_type": report_type,
+            "severity": report_severity,
+            "status": "Pending verification",
+            "start_date": str(start_date),
+            "expected_end": str(expected_end),
+            "affected_area": affected_area.strip(),
+            "description": description.strip(),
+            "suggested_detour": detour.strip() or "Not provided",
+            "source": "USER"
+        }
 
-        elif expected_end < start_date:
+        updated_df = pd.concat(
+            [df, pd.DataFrame([new_record])],
+            ignore_index=True
+        )
 
-            st.error(
-                "Expected end date cannot be before the start date."
-            )
+        save_data(updated_df)
 
-        else:
+        st.success(
+            "Report submitted successfully! "
+            "It is marked as Pending verification."
+        )
 
-            lat, lon = LOCATIONS[report_location]
+        st.rerun()
 
-            new_record = {
-                "report_id": "USER-" + uuid.uuid4().hex[:8].upper(),
-                "location": report_location,
-                "latitude": lat,
-                "longitude": lon,
-                "alert_type": report_type,
-                "severity": report_severity,
-                "status": "Pending verification",
-                "start_date": str(start_date),
-                "expected_end": str(expected_end),
-                "affected_area": affected_area.strip(),
-                "description": description.strip(),
-                "suggested_detour": detour.strip() or "Not provided",
-                "source": "USER"
-            }
-
-            updated_df = pd.concat(
-                [df, pd.DataFrame([new_record])],
-                ignore_index=True
-            )
-
-            save_data(updated_df)
-
-            st.success(
-                "Report submitted successfully! "
-                "It is marked as Pending verification."
-            )
-
-            st.rerun()
 
 
 # --------------------------------------------------

@@ -37,3 +37,5 @@ secrets.toml
 smart-city-traffic-dashboard/data/raw/varanasi_drive_graph.graphml
 *.zip
 smart-city-traffic-dashboard/module3_temp/
+# User-submitted community reports
+data/user/

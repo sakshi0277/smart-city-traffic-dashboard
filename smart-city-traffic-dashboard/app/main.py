@@ -269,42 +269,42 @@ inject_css()
 data = build_simulation()
 
 # ---------------------------- Sidebar ---------------------------------------
+# ---------------------------- Sidebar ---------------------------------------
 with st.sidebar:
+
+    # Brand
     st.markdown(
-        f"<div class='brand'><div class='logo'>🚦</div><div>"
-        f"<div class='name'>Varanasi Traffic</div>"
-        f"<div class='sub'>Route Intelligence</div></div></div>",
+        "<div class='brand'><div class='logo'>🚦</div><div>"
+        "<div class='name'>Varanasi Traffic</div>"
+        "<div class='sub'>Route Intelligence</div></div></div>",
         unsafe_allow_html=True,
     )
 
-    st.markdown("<div class='nav-title'>Navigation</div>", unsafe_allow_html=True)
-    # These modules are built phase by phase. Only the home page exists today,
-    # so the others are shown as "Soon" rather than as broken links.
-    nav = [
-        ("🏠", "Overview", True),
-        ("🗺️", "Traffic Map", False),
-        ("🧭", "Route Comparison", False),
-        ("🚧", "Closures & Construction", False),
-        ("🚌", "Public Transport", False),
-        ("💥", "Accident Analysis", False),
-        ("🛣️", "Road Condition", False),
-        ("⛅", "Weather", False),
-        ("🤖", "Congestion Prediction", False),
-        ("📣", "Community Reports", False),
-    ]
-    for icon, name, active in nav:
-        css = "active" if active else "planned"
-        chip = "<span class='chip now'>HERE</span>" if active else "<span class='chip soon'>SOON</span>"
-        st.markdown(
-            f"<div class='nav-item {css}'><span>{icon}&nbsp; {name}</span>{chip}</div>",
-            unsafe_allow_html=True,
-        )
+    # Navigation
+    st.markdown(
+        "<div class='nav-title'>Navigation</div>",
+        unsafe_allow_html=True,
+    )
 
+    st.markdown(
+        "<div class='nav-item active'>"
+        "<span>🏠 Overview</span><span class='chip now'>HERE</span>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.page_link("pages/1_Traffic_Map.py", label="Traffic Map", icon="🗺️")
+    st.page_link("pages/2_Route_Comparison.py", label="Route Comparison", icon="🧭")
+    st.page_link("pages/3_road_closures.py", label="Closures & Construction", icon="🚧")
+    st.page_link("pages/4_transport_intelligence.py", label="Transport Intelligence", icon="🚌")
+    st.page_link("pages/5_weather_intelligence.py", label="Weather Intelligence", icon="⛅")
+    st.page_link("pages/6_ai_traffic_prediction.py", label="AI Traffic Prediction", icon="🤖")
+
+    # Existing day and hour controls
     st.markdown("<div class='nav-title'>Explore a typical day</div>", unsafe_allow_html=True)
     day = st.selectbox("Day of week", DAYS, index=1)
     hour = st.slider("Hour of day", 0, 23, 9, format="%d:00")
     st.caption("Modelled scenario from a simulation. Not the current time and not live traffic.")
-
 # ---------------------------- Hero ------------------------------------------
 st.markdown(
     f"<h1 class='hero-title'>{cfg['project']['title']}</h1>"
@@ -314,15 +314,14 @@ st.markdown(
     f"<span class='badge ver'>v{cfg['project']['version']}</span>",
     unsafe_allow_html=True,
 )
+
 st.markdown(
     "<div class='notice'><b>Please read:</b> there is no free, open live-traffic feed for "
     "Varanasi. All congestion figures on this page come from a <b>simulation</b> based on "
     "stated assumptions (rush-hour patterns and area multipliers). They are "
     "<b>never</b> live or real-time traffic.</div>",
     unsafe_allow_html=True,
-)
-
-# ---------------------------- KPI numbers -----------------------------------
+)# ---------------------------- KPI numbers -----------------------------------
 day_data = data[data["day"] == day]
 city_by_hour = day_data.groupby("hour")["congestion_index"].mean()
 now_slice = day_data[day_data["hour"] == hour].sort_values("congestion_index", ascending=False)

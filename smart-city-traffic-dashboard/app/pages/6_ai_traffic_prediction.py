@@ -1,15 +1,20 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
+
 from src.traffic_predictor import train_model, predict_congestion
 from src.traffic_simulator import AREAS, DAYS
+
 
 st.set_page_config(
     page_title="AI Traffic Prediction | Varanasi Smart City",
     page_icon="🤖",
     layout="wide"
 )
+
+# ---------------- PREMIUM THEME ----------------
 
 st.markdown("""
 <style>
@@ -53,24 +58,28 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 st.markdown("""
 <div class="hero">
     <h1>🤖 AI Traffic Prediction & Smart Recommendations</h1>
-    <p>Random Forest based congestion prediction for Varanasi localities</p>
+    <p>Machine Learning based traffic intelligence for Varanasi</p>
 </div>
 """, unsafe_allow_html=True)
 
+
 st.warning(
-    "SIMULATED TRAINING DATA: The Random Forest model is trained "
-    "on this project's simulated traffic dataset. Predictions are "
-    "not live traffic measurements or verified real-world forecasts."
+    "SIMULATED TRAINING DATA: The Random Forest model uses this "
+    "project's simulated traffic dataset. Predictions are not live "
+    "traffic measurements or verified real-world forecasts."
 )
+
 
 # ---------------- MODEL TRAINING ----------------
 
 @st.cache_resource
 def get_model_results():
     return train_model()
+
 
 with st.spinner("Training Random Forest model..."):
     results = get_model_results()
@@ -79,6 +88,7 @@ model = results["model"]
 
 st.success("Random Forest model trained successfully!")
 
+
 # ---------------- MODEL PERFORMANCE ----------------
 
 st.markdown(
@@ -86,29 +96,137 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-m1, m2, m3, m4 = st.columns(4)
-
 metrics = [
-    ("MAE", f"{results['mae']:.2f}"),
-    ("RMSE", f"{results['rmse']:.2f}"),
+    ("Random Forest MAE", f"{results['mae']:.2f}"),
+    ("Random Forest RMSE", f"{results['rmse']:.2f}"),
     ("R² Score", f"{results['r2']:.3f}"),
-    ("Training Rows", str(results["training_rows"]))
+    ("Baseline MAE", f"{results['baseline_mae']:.2f}"),
+    ("Training Rows", str(results["training_rows"])),
+    ("Testing Rows", str(results["testing_rows"]))
 ]
 
-for col, (label, value) in zip([m1, m2, m3, m4], metrics):
-    with col:
-        st.markdown(
-            f'<div class="metric-card">'
-            f'<div class="metric-value">{value}</div>'
-            f'<div class="metric-label">{label}</div>'
-            f'</div>',
-            unsafe_allow_html=True
-        )
+for start in range(0, len(metrics), 3):
+    cols = st.columns(3)
+
+    for col, (label, value) in zip(
+        cols, metrics[start:start + 3]
+    ):
+        with col:
+            st.markdown(
+                f'<div class="metric-card">'
+                f'<div class="metric-value">{value}</div>'
+                f'<div class="metric-label">{label}</div>'
+                f'</div>',
+                unsafe_allow_html=True
+            )
 
 st.caption(
-    f"Test samples: {results['testing_rows']} | "
-    "80% training / 20% testing split."
+    "Chronological evaluation: earlier time periods for training "
+    "and later time periods for testing. The dataset represents "
+    "one simulated week."
 )
+
+
+# ---------------- MODEL COMPARISON ----------------
+
+st.markdown(
+    '<div class="section-title">⚖️ Random Forest vs Baseline Comparison</div>',
+    unsafe_allow_html=True
+)
+
+comparison_df = pd.DataFrame({
+    "Model": ["Random Forest", "Baseline"],
+    "MAE": [
+        results["mae"],
+        results["baseline_mae"]
+    ],
+    "RMSE": [
+        results["rmse"],
+        results["baseline_rmse"]
+    ]
+})
+
+comparison_metric = st.selectbox(
+    "Select evaluation metric",
+    ["MAE", "RMSE"]
+)
+
+fig_comparison = px.bar(
+    comparison_df,
+    x="Model",
+    y=comparison_metric,
+    color="Model",
+    text=comparison_metric,
+    title=f"Model Comparison — {comparison_metric}",
+    color_discrete_map={
+        "Random Forest": "#38d9e6",
+        "Baseline": "#8b7cf6"
+    }
+)
+
+fig_comparison.update_layout(
+    template="plotly_dark",
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    showlegend=False
+)
+
+st.plotly_chart(fig_comparison, use_container_width=True)
+
+improvement = (
+    (results["baseline_mae"] - results["mae"])
+    / results["baseline_mae"] * 100
+)
+
+st.info(
+    f"Random Forest MAE is {improvement:.1f}% lower than "
+    "the baseline MAE on this simulated test dataset."
+)
+
+
+# ---------------- ACTUAL VS PREDICTED ----------------
+
+st.markdown(
+    '<div class="section-title">🎯 Actual vs Predicted Traffic</div>',
+    unsafe_allow_html=True
+)
+
+test_results = results["test_results"].copy()
+
+fig_actual = px.scatter(
+    test_results,
+    x="Actual",
+    y="Random Forest Prediction",
+    color="area",
+    hover_data=["day", "hour"],
+    title="Actual Congestion vs Random Forest Prediction"
+)
+
+fig_actual.add_trace(
+    go.Scatter(
+        x=[0, 100],
+        y=[0, 100],
+        mode="lines",
+        name="Ideal Prediction",
+        line=dict(color="white", dash="dash")
+    )
+)
+
+fig_actual.update_layout(
+    template="plotly_dark",
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    xaxis=dict(title="Actual Congestion", range=[0, 100]),
+    yaxis=dict(title="Predicted Congestion", range=[0, 100])
+)
+
+st.plotly_chart(fig_actual, use_container_width=True)
+
+st.caption(
+    "Points closer to the dashed diagonal represent predictions "
+    "closer to actual simulated values."
+)
+
 
 # ---------------- PREDICTION SETTINGS ----------------
 
@@ -120,7 +238,9 @@ st.markdown(
 c1, c2, c3 = st.columns(3)
 
 with c1:
-    selected_area = st.selectbox("Select Locality", list(AREAS.keys()))
+    selected_area = st.selectbox(
+        "Select Locality", list(AREAS.keys())
+    )
 
 with c2:
     selected_day = st.selectbox("Select Day", DAYS)
@@ -132,6 +252,7 @@ with c3:
         format="%d:00"
     )
 
+
 # ---------------- SIX HOUR PREDICTION ----------------
 
 forecast_rows = []
@@ -140,7 +261,10 @@ for step in range(6):
     absolute_hour = selected_hour + step
     day_offset = absolute_hour // 24
     hour = absolute_hour % 24
-    day = DAYS[(DAYS.index(selected_day) + day_offset) % 7]
+
+    day = DAYS[
+        (DAYS.index(selected_day) + day_offset) % 7
+    ]
 
     predicted_value = predict_congestion(
         selected_area, day, hour, model
@@ -155,7 +279,10 @@ for step in range(6):
 
 forecast = pd.DataFrame(forecast_rows)
 
-current_value = float(forecast.iloc[0]["Predicted Congestion"])
+current_value = float(
+    forecast.iloc[0]["Predicted Congestion"]
+)
+
 
 def risk_level(value):
     if value < 35:
@@ -164,22 +291,32 @@ def risk_level(value):
         return "Moderate"
     return "High"
 
+
 current_risk = risk_level(current_value)
 
-# ---------------- PREDICTION KPIs ----------------
+
+# ---------------- PREDICTION OVERVIEW ----------------
 
 st.markdown(
     '<div class="section-title">🚦 Traffic Prediction Overview</div>',
     unsafe_allow_html=True
 )
 
-peak = forecast.loc[forecast["Predicted Congestion"].idxmax()]
-best = forecast.loc[forecast["Predicted Congestion"].idxmin()]
+peak = forecast.loc[
+    forecast["Predicted Congestion"].idxmax()
+]
+
+best = forecast.loc[
+    forecast["Predicted Congestion"].idxmin()
+]
 
 k1, k2, k3 = st.columns(3)
 
 with k1:
-    st.metric("Predicted Congestion", f"{current_value:.1f}/100")
+    st.metric(
+        "Predicted Congestion",
+        f"{current_value:.1f}/100"
+    )
 
 with k2:
     st.metric("Risk Level", current_risk)
@@ -187,7 +324,8 @@ with k2:
 with k3:
     st.metric("Peak Hour (Next 6 Hours)", peak["Hour"])
 
-# ---------------- FORECAST CHART ----------------
+
+# ---------------- SIX HOUR ML PREDICTION ----------------
 
 st.markdown(
     '<div class="section-title">📈 Six-Hour ML Prediction</div>',
@@ -219,7 +357,8 @@ fig.update_layout(
 
 st.plotly_chart(fig, use_container_width=True)
 
-# ---------------- PEAK HOUR ANALYSIS ----------------
+
+# ---------------- CITY PEAK HOUR ANALYSIS ----------------
 
 st.markdown(
     '<div class="section-title">⏰ City Peak-Hour Analysis</div>',
@@ -269,6 +408,69 @@ st.info(
     f"{int(peak_city['Hour']):02d}:00 "
     f"(index {peak_city['Average Predicted Congestion']:.1f})."
 )
+
+
+# ---------------- 24 HOUR LOCALITY HEATMAP ----------------
+
+st.markdown(
+    '<div class="section-title">🔥 City-Wide 24-Hour Congestion Heatmap</div>',
+    unsafe_allow_html=True
+)
+
+heatmap_rows = []
+
+for area in AREAS.keys():
+    row = []
+
+    for hour in range(24):
+        value = predict_congestion(
+            area, selected_day, hour, model
+        )
+        row.append(value)
+
+    heatmap_rows.append(row)
+
+heatmap_df = pd.DataFrame(
+    heatmap_rows,
+    index=list(AREAS.keys()),
+    columns=[f"{hour:02d}:00" for hour in range(24)]
+)
+
+fig_heatmap = px.imshow(
+    heatmap_df,
+    labels={
+        "x": "Hour of Day",
+        "y": "Locality",
+        "color": "Congestion"
+    },
+color_continuous_scale=[
+    [0.0, "#16A34A"],
+    [0.5, "#F59E0B"],
+    [1.0, "#DC2626"]
+],
+aspect="auto",
+zmin=0,
+zmax=100,
+    title=f"Predicted Congestion Across Varanasi — {selected_day}"
+)
+
+fig_heatmap.update_layout(
+    template="plotly_dark",
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
+    coloraxis_colorbar_title="Index"
+)
+
+st.plotly_chart(
+    fig_heatmap,
+    use_container_width=True
+)
+
+st.caption(
+    "Heatmap values are model predictions on a simulated dataset. "
+    "Red indicates higher predicted congestion; green indicates lower."
+)
+
 
 # ---------------- LOCALITY RISK ----------------
 
@@ -324,6 +526,7 @@ st.dataframe(
     hide_index=True
 )
 
+
 # ---------------- SMART RECOMMENDATIONS ----------------
 
 st.markdown(
@@ -337,11 +540,13 @@ if current_risk == "High":
         f"The lowest predicted congestion in the next six hours "
         f"is around {best['Hour']}."
     )
+
 elif current_risk == "Moderate":
     st.info(
         f"Moderate predicted congestion. If flexible, consider "
         f"travelling around {best['Hour']}."
     )
+
 else:
     st.success(
         "The selected hour has comparatively low predicted congestion."
@@ -358,6 +563,7 @@ st.caption(
     "verified alternative road routes. Use Route Comparison "
     "for road-network route alternatives."
 )
+
 
 # ---------------- FEATURE IMPORTANCE ----------------
 
@@ -384,7 +590,8 @@ fig_importance.update_layout(
 
 st.plotly_chart(fig_importance, use_container_width=True)
 
-# ---------------- DOWNLOAD ----------------
+
+# ---------------- DOWNLOAD REPORT ----------------
 
 st.markdown(
     '<div class="section-title">📥 Download Prediction Report</div>',
